@@ -60,12 +60,8 @@ function b64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-// PTY → terminal
-await listen<string>('pty-output', (e) => term.write(b64ToBytes(e.payload)));
-
-await listen<number | null>('pty-exit', (e) => {
+function handleExit(code: number | null): void {
   exited = true;
-  const code = e.payload;
   overlayMsg.textContent =
     code && code !== 0
       ? `SpearCode s'est arrêté (code ${code}).`
@@ -74,6 +70,21 @@ await listen<number | null>('pty-exit', (e) => {
   const close = () => getCurrentWindow().close();
   window.addEventListener('keydown', close, { once: true });
   overlay.addEventListener('click', close, { once: true });
+}
+
+// The engine is already running (started in Rust `setup`). Buffer any
+// events that arrive before the backlog is written so order is preserved.
+let live = false;
+const queued: Array<{ kind: 'out'; data: Uint8Array } | { kind: 'exit'; code: number | null }> = [];
+
+await listen<string>('pty-output', (e) => {
+  const bytes = b64ToBytes(e.payload);
+  if (live) term.write(bytes);
+  else queued.push({ kind: 'out', data: bytes });
+});
+await listen<number | null>('pty-exit', (e) => {
+  if (live) handleExit(e.payload);
+  else queued.push({ kind: 'exit', code: e.payload });
 });
 
 // terminal → PTY
@@ -110,9 +121,20 @@ const ro = new ResizeObserver(() => {
 });
 ro.observe(el);
 
-// Boot the SpearCode process in its PTY
+// Attach: flush whatever the engine printed before we were listening,
+// then replay queued live events in order, then go live.
 try {
-  await invoke('pty_start', { cols: term.cols, rows: term.rows });
+  const backlog = await invoke<string>('pty_ready', {
+    cols: term.cols,
+    rows: term.rows,
+  });
+  if (backlog) term.write(b64ToBytes(backlog));
+  for (const ev of queued) {
+    if (ev.kind === 'out') term.write(ev.data);
+    else handleExit(ev.code);
+  }
+  queued.length = 0;
+  live = true;
 } catch (err) {
   term.write(`\r\n\x1b[31mImpossible de démarrer SpearCode : ${String(err)}\x1b[0m\r\n`);
 }

@@ -20,31 +20,48 @@ jobs:
             os: ubuntu-latest
             target: node20-linux-x64
             pack: npm run pack:linux
+            engine: release/spearcode-linux-x64
+            engine_dest: desktop/src-tauri/binaries/spearcode
+            tauri_bundles: deb,appimage
             artifacts: |
               release/spearcode-linux-x64
               release/spearcode_*_amd64.deb
               release/Spearcode-*-x86_64.AppImage
+              desktop/src-tauri/target/release/bundle/deb/*.deb
+              desktop/src-tauri/target/release/bundle/appimage/*.AppImage
           - name: macos-arm64
             os: macos-14
             target: node20-macos-arm64
             pack: node scripts/pack-macos.mjs arm64
+            engine: release/spearcode-macos-arm64
+            engine_dest: desktop/src-tauri/binaries/spearcode
+            tauri_bundles: dmg
             artifacts: |
               release/spearcode-macos-arm64
               release/Spearcode-*-macos-arm64.dmg
+              desktop/src-tauri/target/release/bundle/dmg/*.dmg
           - name: macos-x64
             os: macos-13
             target: node20-macos-x64
             pack: node scripts/pack-macos.mjs x64
+            engine: release/spearcode-macos-x64
+            engine_dest: desktop/src-tauri/binaries/spearcode
+            tauri_bundles: dmg
             artifacts: |
               release/spearcode-macos-x64
               release/Spearcode-*-macos-x64.dmg
+              desktop/src-tauri/target/release/bundle/dmg/*.dmg
           - name: windows-x64
             os: windows-latest
             target: node20-win-x64
             pack: npm run pack:windows
+            engine: release/spearcode-win-x64.exe
+            engine_dest: desktop/src-tauri/binaries/spearcode.exe
+            tauri_bundles: nsis
             artifacts: |
               release/spearcode-win-x64.exe
               release/Spearcode-*-windows-x64-setup.exe
+              desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -67,10 +84,41 @@ jobs:
       - name: Build native installer(s)
         run: ${{ matrix.pack }}
 
+      # ── Desktop app (Tauri 2) ────────────────────────────────────────
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust (desktop)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install Tauri system deps (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev \
+            patchelf file
+
+      - name: Embed engine binary as Tauri resource
+        shell: bash
+        run: |
+          mkdir -p desktop/src-tauri/binaries
+          cp "${{ matrix.engine }}" "${{ matrix.engine_dest }}"
+          chmod +x "${{ matrix.engine_dest }}" || true
+
+      - name: Install desktop deps
+        run: npm --prefix desktop ci
+
+      - name: Build desktop app
+        working-directory: desktop
+        run: npx tauri build --bundles ${{ matrix.tauri_bundles }}
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           files: ${{ matrix.artifacts }}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SpearCode",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "identifier": "cloud.scarletwolf.spearcode",
   "build": {
     "beforeDevCommand": "npm run web:dev",
@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": ["deb", "appimage", "dmg", "nsis"],
     "category": "Development",
     "shortDescription": "AI coding agent — windowed app",
     "longDescription": "SpearCode as a real desktop window: the full Ink TUI hosted in a native window via a PTY, with its own icon and dock entry.",
@@ -40,7 +40,7 @@
       "icons/128x128@2x.png",
       "icons/icon.png"
     ],
-    "resources": {},
+    "resources": ["binaries/*"],
     "linux": {
       "deb": {
         "depends": []

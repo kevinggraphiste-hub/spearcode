@@ -1,7 +1,7 @@
 {
   "name": "spearcode-desktop",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "SpearCode as a real windowed desktop app — hosts the existing Ink TUI in a Tauri 2 window via a PTY + xterm.js.",
   "type": "module",
   "scripts": {

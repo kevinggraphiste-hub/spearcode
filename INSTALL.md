@@ -96,6 +96,32 @@ bash scripts/install-desktop-launcher.sh "$(command -v spearcode)"   # after ins
 
 Idempotent — re-run after each upgrade. Launch logs: `~/.cache/spearcode/launch.log`.
 
+### Desktop app (real window — recommended for GUI users)
+
+A proper windowed application (own icon, own dock/alt-tab entry, no terminal
+chrome) — the same SpearCode UI hosted in a native window. Download the
+desktop installer from the [release][rel] for your OS:
+
+| OS | Desktop installer |
+|----|-------------------|
+| Linux | `SpearCode_<ver>_amd64.deb` or `SpearCode_<ver>_amd64.AppImage` |
+| macOS | `SpearCode_<ver>_*.dmg` |
+| Windows | `SpearCode_<ver>_x64-setup.exe` |
+
+It bundles its own SpearCode engine — nothing else to install. Diagnostics:
+`~/.cache/spearcode/desktop.log`.
+
+Build it from source (Tauri 2 — needs Rust + WebView libs, see
+[`desktop/README.md`](desktop/README.md)):
+
+```bash
+npm run app:install   # one-time
+npm run app:dev        # run the window (uses your local release/ engine)
+npm run app:build      # produce the native installers
+```
+
+[rel]: https://github.com/kevinggraphiste-hub/spearcode/releases/latest
+
 ---
 
 ## From source

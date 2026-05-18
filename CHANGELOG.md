@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 (2026-05-18)
+
+SpearCode is now a **real windowed desktop app** — not just a terminal tool.
+
+### Added
+- **`desktop/` — Tauri 2 application.** The exact same Ink TUI, hosted in a
+  native window (own icon, own dock/alt-tab entry, no terminal chrome).
+  A real PTY (`portable-pty`) runs the self-contained SpearCode engine and
+  streams it to xterm.js in a system WebView. Zero UI rewrite — the window
+  *is* SpearCode. Lean: ~3.5 MB binary, no Chromium/Node bundled.
+- Engine starts in Rust `setup` with output buffered until the webview
+  attaches, so the first TUI frame is never lost; clean close kills the
+  engine; window/PTY resize kept in sync; copy/paste; slate/red theme.
+- Binary resolution: `$SPEARCODE_BIN` → bundled resource → `spearcode` on
+  `PATH` → source `release/` build. Diagnostics: `~/.cache/spearcode/desktop.log`.
+- Release CI now also builds the desktop bundles (`.deb`/`.AppImage`/`.dmg`/
+  NSIS `.exe`) per OS and attaches them to the GitHub Release.
+
 ## 0.1.3 (2026-05-18)
 
 The Linux GUI launcher now actually opens SpearCode.

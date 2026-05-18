@@ -1,6 +1,11 @@
 // SpearCode desktop: host the existing Ink TUI inside a Tauri 2 window.
 // A real PTY runs the self-contained SpearCode binary; its output is
 // streamed to xterm.js in the webview and keystrokes are piped back.
+//
+// The engine is started as soon as the window is created (Rust `setup`),
+// not on a frontend request: output produced before the webview has
+// attached its listeners is buffered in `backlog` and flushed on
+// `pty_ready`, so the very first TUI frame is never lost.
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -12,10 +17,38 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 #[derive(Default)]
+struct OutState {
+    ready: bool,
+    backlog: Vec<u8>,
+}
+
+#[derive(Default)]
 struct Pty {
     master: Mutex<Option<Box<dyn MasterPty + Send>>>,
     writer: Mutex<Option<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Option<Box<dyn Child + Send + Sync>>>>,
+    out: Arc<Mutex<OutState>>,
+}
+
+fn b64(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+/// Append a diagnostic line to ~/.cache/spearcode/desktop.log.
+/// Lets a misbehaving window ("blank") be diagnosed after the fact.
+fn log(msg: &str) {
+    let dir = std::env::var("XDG_CACHE_HOME")
+        .unwrap_or_else(|_| format!("{}/.cache", std::env::var("HOME").unwrap_or_default()));
+    let dir = format!("{dir}/spearcode");
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(format!("{dir}/desktop.log"))
+    {
+        use std::io::Write as _;
+        let _ = writeln!(f, "[{}] {msg}", std::process::id());
+    }
 }
 
 /// Resolve the SpearCode engine binary.
@@ -34,25 +67,22 @@ fn resolve_bin(app: &AppHandle) -> Option<PathBuf> {
     } else {
         "spearcode"
     };
-    if let Ok(res) = app
-        .path()
-        .resolve(res_name, tauri::path::BaseDirectory::Resource)
-    {
-        if res.is_file() {
-            return Some(res);
+    for rel in [res_name, &format!("binaries/{res_name}")] {
+        if let Ok(res) = app
+            .path()
+            .resolve(rel, tauri::path::BaseDirectory::Resource)
+        {
+            if res.is_file() {
+                return Some(res);
+            }
         }
     }
 
-    let probe = if cfg!(target_os = "windows") {
-        ("where", "spearcode")
-    } else {
-        ("sh", "-c")
-    };
     let out = if cfg!(target_os = "windows") {
-        std::process::Command::new(probe.0).arg(probe.1).output()
+        std::process::Command::new("where").arg("spearcode").output()
     } else {
-        std::process::Command::new(probe.0)
-            .arg(probe.1)
+        std::process::Command::new("sh")
+            .arg("-c")
             .arg("command -v spearcode")
             .output()
     };
@@ -99,16 +129,13 @@ fn workdir() -> String {
         .unwrap_or_else(|| ".".to_string())
 }
 
-#[tauri::command]
-fn pty_start(
-    app: AppHandle,
-    state: State<'_, Pty>,
-    cols: u16,
-    rows: u16,
-) -> Result<(), String> {
-    let bin = resolve_bin(&app).ok_or_else(|| {
+/// Spawn the SpearCode engine in a PTY and start streaming.
+fn start_engine(app: &AppHandle, state: &Pty, cols: u16, rows: u16) -> Result<(), String> {
+    log(&format!("start_engine cols={cols} rows={rows}"));
+    let bin = resolve_bin(app).ok_or_else(|| {
         "Binaire SpearCode introuvable (définis $SPEARCODE_BIN ou build release/)".to_string()
     })?;
+    log(&format!("resolved bin = {}", bin.display()));
 
     let pty = native_pty_system();
     let pair = pty
@@ -128,7 +155,11 @@ fn pty_start(
     cmd.env("COLORTERM", "truecolor");
     cmd.cwd(workdir());
 
-    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let child = pair.slave.spawn_command(cmd).map_err(|e| {
+        log(&format!("spawn_command FAILED: {e}"));
+        e.to_string()
+    })?;
+    log(&format!("engine spawned, child pid = {:?}", child.process_id()));
     drop(pair.slave);
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -139,29 +170,71 @@ fn pty_start(
     *state.child.lock().unwrap() = Some(child);
 
     let child_arc = Arc::clone(&state.child);
+    let out_arc = Arc::clone(&state.out);
+    let app2 = app.clone();
     thread::spawn(move || {
         let mut buf = [0u8; 8192];
+        let mut logged_first = false;
         loop {
             match reader.read(&mut buf) {
-                Ok(0) | Err(_) => break,
+                Ok(0) => {
+                    log("engine stdout EOF");
+                    break;
+                }
+                Err(e) => {
+                    log(&format!("engine read error: {e}"));
+                    break;
+                }
                 Ok(n) => {
-                    let payload = base64::engine::general_purpose::STANDARD.encode(&buf[..n]);
-                    if app.emit("pty-output", payload).is_err() {
-                        break;
+                    if !logged_first {
+                        log(&format!("first {n} bytes from engine"));
+                        logged_first = true;
+                    }
+                    // Emit live once the webview is attached; until then
+                    // accumulate so the first frame is not lost.
+                    let mut g = out_arc.lock().unwrap();
+                    if g.ready {
+                        drop(g);
+                        if app2.emit("pty-output", b64(&buf[..n])).is_err() {
+                            break;
+                        }
+                    } else {
+                        g.backlog.extend_from_slice(&buf[..n]);
                     }
                 }
             }
         }
         let code = {
-            let mut g = child_arc.lock().unwrap();
-            g.take()
+            let mut c = child_arc.lock().unwrap();
+            c.take()
                 .and_then(|mut c| c.wait().ok())
                 .map(|st| st.exit_code() as i32)
         };
-        let _ = app.emit("pty-exit", code);
+        log(&format!("engine exited, code = {code:?}"));
+        let _ = app2.emit("pty-exit", code);
     });
 
     Ok(())
+}
+
+/// Webview is up and listening: switch to live streaming, return any
+/// output produced before now (base64) and resize to the real terminal.
+#[tauri::command]
+fn pty_ready(state: State<'_, Pty>, cols: u16, rows: u16) -> String {
+    if cols > 0 && rows > 0 {
+        if let Some(m) = state.master.lock().unwrap().as_ref() {
+            let _ = m.resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            });
+        }
+    }
+    let mut g = state.out.lock().unwrap();
+    g.ready = true;
+    let drained = std::mem::take(&mut g.backlog);
+    b64(&drained)
 }
 
 #[tauri::command]
@@ -191,11 +264,29 @@ fn pty_resize(state: State<'_, Pty>, cols: u16, rows: u16) -> Result<(), String>
 pub fn run() {
     tauri::Builder::default()
         .manage(Pty::default())
-        .invoke_handler(tauri::generate_handler![pty_start, pty_write, pty_resize])
+        .invoke_handler(tauri::generate_handler![pty_ready, pty_write, pty_resize])
+        .setup(|app| {
+            log("=== setup ===");
+            // Launch the engine immediately so the window has content the
+            // moment it appears (default size; the webview resizes on attach).
+            let handle = app.handle().clone();
+            let state = app.state::<Pty>();
+            if let Err(e) = start_engine(&handle, state.inner(), 100, 30) {
+                log(&format!("start_engine error: {e}"));
+                let mut g = state.out.lock().unwrap();
+                g.backlog
+                    .extend_from_slice(format!("\r\n\x1b[31m{e}\x1b[0m\r\n").as_bytes());
+            }
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event {
-                let state = window.state::<Pty>();
-                if let Some(mut c) = state.child.lock().unwrap().take() {
+                // Clone the Arc out so we don't hold the `State` borrow,
+                // and take() in its own statement so the lock guard is
+                // dropped at the `;` (not extended to the if-let block).
+                let child = window.state::<Pty>().child.clone();
+                let taken = child.lock().unwrap().take();
+                if let Some(mut c) = taken {
                     let _ = c.kill();
                 }
             }

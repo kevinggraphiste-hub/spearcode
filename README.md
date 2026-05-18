@@ -43,9 +43,10 @@
 
 ## Installation
 
-SpearCode ships as a **self-contained binary — no Node.js required**.
-See [INSTALL.md](INSTALL.md) for every option (portable, native installers,
-from source).
+SpearCode ships as a **self-contained binary — no Node.js required**, and as
+a **real windowed desktop app** (`.deb`/`.AppImage`/`.dmg`/`.exe` — same UI,
+native window). See [INSTALL.md](INSTALL.md) for every option (portable,
+native installers, desktop app, from source).
 
 ```bash
 # macOS / Linux — one-line install
