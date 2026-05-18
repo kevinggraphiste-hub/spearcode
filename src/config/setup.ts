@@ -92,11 +92,14 @@ export async function runSetupWizard(cwd: string): Promise<SetupResult> {
 
   let providerIndex = 0;
   if (available.length > 1) {
-    const answer = await ask('  Choisis un provider (numéro) : ');
-    providerIndex = Math.max(0, Math.min(parseInt(answer) - 1, available.length - 1));
+    const answer = await ask('  Choisis un provider (numéro) [1] : ');
+    const n = parseInt(answer, 10);
+    providerIndex = Number.isFinite(n)
+      ? Math.max(0, Math.min(n - 1, available.length - 1))
+      : 0;
   }
 
-  const selectedProvider = available[providerIndex];
+  const selectedProvider = available[providerIndex] ?? available[0];
   console.log(`\n  ✓ Provider: ${selectedProvider.name}\n`);
 
   // Step 2: Select model

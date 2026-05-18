@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.2 (2026-05-18)
+
+Portable binary now actually launches the TUI. Fixes four real bugs on the
+`chat` (default) path that made the standalone binary unusable.
+
+### Fixed
+- **Segfault on launch**: pkg's Node base lacks full ICU; Ink's text-width
+  libs called native `Intl.Segmenter` → V8 crash. Now polyfilled (pure-JS
+  code-point segmenter) in the bundle.
+- **`ReactCurrentOwner` crash**: Ink 5 is incompatible with React 19 →
+  pinned `react`/`@types/react` to 18.
+- **`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`**: dynamic `import('node:*')`
+  fails inside a pkg snapshot → converted to static imports.
+- **Setup wizard crash**: empty/non-numeric provider choice → `undefined`.
+  Hardened input; the wizard is now skipped when a provider key is already
+  in the environment, and exits cleanly with guidance when none is.
+- Version is now sourced from a single `src/version.ts` (no more hardcoded
+  `0.1.0` in `--version`).
+
 ## 0.1.1 (2026-05-18)
 
 First standalone, distributable release — isolated from the Gungnir plugin.

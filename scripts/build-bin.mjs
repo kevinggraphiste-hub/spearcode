@@ -40,6 +40,23 @@ rmSync(buildDir, { recursive: true, force: true });
 mkdirSync(buildDir, { recursive: true });
 mkdirSync(outDir, { recursive: true });
 
+// pkg's prebuilt Node base ships without full ICU: calling the native
+// Intl.Segmenter (used by Ink's text-width libs) SEGFAULTS V8 instead of
+// throwing. Replace it with a pure-JS code-point segmenter, injected
+// before any module evaluates so the broken builtin is never reached.
+const intlSegmenterPolyfill =
+  ';(function(){try{var G=globalThis;if(!G.Intl)G.Intl={};' +
+  'function S(l,o){this._g=(o&&o.granularity)||"grapheme";this._l=l;}' +
+  'S.prototype.resolvedOptions=function(){return{locale:(Array.isArray(this._l)?this._l[0]:this._l)||"en",granularity:this._g};};' +
+  'S.prototype.segment=function(s){s=String(s);' +
+  'var p=this._g==="grapheme"?Array.from(s):s.split(/(\\s+)/).filter(function(x){return x.length;});' +
+  'return {[Symbol.iterator]:function(){var i=0,off=0;return {next:function(){' +
+  'if(i>=p.length)return{value:undefined,done:true};' +
+  'var g=p[i++],ix=off;off+=g.length;' +
+  'return{value:{segment:g,index:ix,input:s,isWordLike:/\\w/.test(g)},done:false};},' +
+  '[Symbol.iterator]:function(){return this;}};}};};' +
+  'G.Intl.Segmenter=S;}catch(e){}})();';
+
 console.log(`• esbuild → ${bundle}`);
 await build({
   entryPoints: [join(root, 'src/cli/index.ts')],
@@ -58,7 +75,7 @@ await build({
   alias: { 'react-devtools-core': join(root, 'scripts', 'stub-react-devtools-core.mjs') },
   // ESM bundles have no CJS `require`; reinstate it for the few
   // `require()` call-sites (collab `ws`, node:fs in testGen).
-  banner: { js: "import{createRequire as ___cr}from'module';const require=___cr(import.meta.url);" },
+  banner: { js: "import{createRequire as ___cr}from'module';const require=___cr(import.meta.url);" + intlSegmenterPolyfill },
   logLevel: 'warning',
 });
 

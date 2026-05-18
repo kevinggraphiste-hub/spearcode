@@ -2,22 +2,42 @@
 
 import { Command } from 'commander';
 import { resolve } from 'node:path';
+import readline from 'node:readline';
 import 'dotenv/config';
 import { Agent } from '../core/agent.js';
 import { analyzeProject, renderTree } from '../core/context.js';
 import { runSetupWizard, isFirstRun } from '../config/setup.js';
+import { VERSION } from '../version.js';
 
 const program = new Command();
 
 program
   .name('spearcode')
   .description('AI coding agent for the terminal')
-  .version('0.1.0');
+  .version(VERSION);
 
 async function ensureSetup(cwd: string, provider?: string, model?: string) {
   if (provider || model) return; // User explicitly chose
   if (!isFirstRun(cwd)) return;
-  await runSetupWizard(cwd);
+  // A provider is already available via the environment (.env or exported
+  // vars) — config defaults cover the rest, so skip the interactive wizard.
+  // This is what makes the portable binary "just run" from anywhere.
+  if (
+    process.env.OPENROUTER_API_KEY ||
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.LOCAL_ENDPOINT
+  ) return;
+  try {
+    await runSetupWizard(cwd);
+  } catch (err) {
+    console.error(`\n${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      'Set a provider key (ANTHROPIC_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY)\n' +
+      'or run the wizard explicitly:  spearcode setup\n',
+    );
+    process.exit(1);
+  }
 }
 
 program
@@ -71,10 +91,9 @@ program
       console.error('Falling back to text mode...\n');
 
       // Fallback to REPL if Ink fails
-      console.log(`SpearCode v0.1.0 — ${agent.getStatus().provider}/${agent.getStatus().model}`);
+      console.log(`SpearCode v${VERSION} — ${agent.getStatus().provider}/${agent.getStatus().model}`);
       console.log(`Working directory: ${opts.cwd}\n`);
 
-      const readline = await import('node:readline');
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,

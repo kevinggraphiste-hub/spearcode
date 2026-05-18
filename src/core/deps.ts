@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { Tool } from '../types/index.js';
 
 export interface DependencyInfo {
@@ -201,8 +203,6 @@ async function checkNodeDeps(cwd: string, checkVulns: boolean): Promise<string> 
     if (checkVulns) {
       lines.push('Running npm audit...');
       try {
-        const { execFile } = await import('node:child_process');
-        const { promisify } = await import('node:util');
         const exec = promisify(execFile);
 
         const { stdout } = await exec('npm', ['audit', '--json'], { cwd, timeout: 30000 });

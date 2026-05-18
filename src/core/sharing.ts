@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Session, Message } from '../types/index.js';
 import { SessionManager } from './session.js';
@@ -112,7 +112,6 @@ export class SessionSharing {
     const dir = join(this.dataDir, SHARED_DIR);
 
     try {
-      const { readdir } = await import('node:fs/promises');
       const files = await readdir(dir);
       const sessions: SharedSession[] = [];
 
