@@ -43,16 +43,23 @@
 
 ## Installation
 
+SpearCode ships as a **self-contained binary — no Node.js required**.
+See [INSTALL.md](INSTALL.md) for every option (portable, native installers,
+from source).
+
 ```bash
-# npm
-npm install -g spearcode
-
-# Quick install (macOS/Linux)
-curl -fsSL https://raw.githubusercontent.com/spearcode/spearcode/main/install.sh | bash
-
-# Windows
-# Download install.bat from releases
+# macOS / Linux — one-line install
+curl -fsSL https://raw.githubusercontent.com/kevinggraphiste-hub/spearcode/main/install.sh | bash
 ```
+
+```powershell
+# Windows — one-line install (PowerShell)
+iwr -useb https://raw.githubusercontent.com/kevinggraphiste-hub/spearcode/main/install.bat -OutFile install.bat; .\install.bat
+```
+
+Prefer not to install? Grab a **portable** binary or a **native installer**
+(`.dmg`, `.exe`, `.AppImage`, `.deb`) from the
+[latest release](https://github.com/kevinggraphiste-hub/spearcode/releases/latest).
 
 ## Quick Start
 

@@ -7,50 +7,70 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-latest
+            target: node20-linux-x64
+            pack: npm run pack:linux
+            artifacts: |
+              release/spearcode-linux-x64
+              release/spearcode_*_amd64.deb
+              release/Spearcode-*-x86_64.AppImage
+          - name: macos-arm64
+            os: macos-14
+            target: node20-macos-arm64
+            pack: node scripts/pack-macos.mjs arm64
+            artifacts: |
+              release/spearcode-macos-arm64
+              release/Spearcode-*-macos-arm64.dmg
+          - name: macos-x64
+            os: macos-13
+            target: node20-macos-x64
+            pack: node scripts/pack-macos.mjs x64
+            artifacts: |
+              release/spearcode-macos-x64
+              release/Spearcode-*-macos-x64.dmg
+          - name: windows-x64
+            os: windows-latest
+            target: node20-win-x64
+            pack: npm run pack:windows
+            artifacts: |
+              release/spearcode-win-x64.exe
+              release/Spearcode-*-windows-x64-setup.exe
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
 
-  publish:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
 
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Install Inno Setup (Windows)
+        if: matrix.name == 'windows-x64'
+        run: choco install innosetup --no-progress -y
 
-  github-release:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Build portable binary
+        run: node scripts/build-bin.mjs ${{ matrix.target }}
 
-      - name: Create Release
+      - name: Build native installer(s)
+        run: ${{ matrix.pack }}
+
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          files: ${{ matrix.artifacts }}
