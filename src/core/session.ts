@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import Database from 'better-sqlite3';
+import { resolveNativeBinding } from './native-binding.js';
 import type { Message, Session, ToolCall } from '../types/index.js';
 
 export class SessionManager {
@@ -9,7 +10,11 @@ export class SessionManager {
 
   constructor(dataDir: string) {
     mkdirSync(dataDir, { recursive: true });
-    this.db = new Database(join(dataDir, 'spearcode.db'));
+    const nativeBinding = resolveNativeBinding();
+    this.db = new Database(
+      join(dataDir, 'spearcode.db'),
+      nativeBinding ? { nativeBinding } : undefined,
+    );
     this.db.pragma('journal_mode = WAL');
     this.initSchema();
   }

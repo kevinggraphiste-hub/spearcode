@@ -56,17 +56,10 @@
     "lint": "eslint src/",
     "prepublishOnly": "npm run build",
     "build:bin": "node scripts/build-bin.mjs",
+    "pack:linux": "node scripts/pack-linux.mjs",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
     "release:major": "npm version major && npm publish"
-  },
-  "pkg": {
-    "assets": [
-      "node_modules/better-sqlite3/**/*",
-      "node_modules/bindings/**/*",
-      "node_modules/file-uri-to-path/**/*"
-    ],
-    "outputPath": "release"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

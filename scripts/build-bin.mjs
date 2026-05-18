@@ -18,12 +18,13 @@
  *              node20-win-x64
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, existsSync, chmodSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, chmodSync, copyFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const bundle = join(root, 'build', 'spearcode.mjs');
+const buildDir = join(root, 'build');
+const bundle = join(buildDir, 'spearcode.mjs');
 const outDir = join(root, 'release');
 
 const target = process.argv[2] || `node20-${hostTarget()}`;
@@ -40,8 +41,8 @@ function run(cmd, args) {
 }
 
 // ── 1. Clean + bundle ──
-rmSync(join(root, 'build'), { recursive: true, force: true });
-mkdirSync(join(root, 'build'), { recursive: true });
+rmSync(buildDir, { recursive: true, force: true });
+mkdirSync(buildDir, { recursive: true });
 mkdirSync(outDir, { recursive: true });
 
 run('npx', [
@@ -73,7 +74,27 @@ if (!existsSync(bundle)) {
   process.exit(1);
 }
 
-// ── 2. Compile to a self-contained executable ──
+// ── 2. Embed the better-sqlite3 native addon next to the bundle ──
+// bindings' dynamic probing can't find it inside a pkg snapshot, so we
+// ship it as a flat asset and load it via better-sqlite3's nativeBinding
+// option (see src/core/native-binding.ts).
+const addonSrc = join(root, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node');
+if (!existsSync(addonSrc)) {
+  console.error(`✗ Missing native addon: ${addonSrc}\n  Run npm install on the target platform first.`);
+  process.exit(1);
+}
+copyFileSync(addonSrc, join(buildDir, 'better_sqlite3.node'));
+
+// pkg only reads asset config reliably via an explicit --config file
+// whose directory is the asset base.
+const pkgConfig = join(buildDir, 'pkg.config.json');
+writeFileSync(pkgConfig, JSON.stringify({
+  name: 'spearcode',
+  bin: 'spearcode.mjs',
+  pkg: { assets: ['better_sqlite3.node'] },
+}, null, 2));
+
+// ── 3. Compile to a self-contained executable ──
 const isWin = target.includes('win');
 const base = `spearcode-${target.replace(/^node20-/, '')}`;
 const outFile = join(outDir, isWin ? `${base}.exe` : base);
@@ -81,6 +102,7 @@ const outFile = join(outDir, isWin ? `${base}.exe` : base);
 run('npx', [
   'pkg',
   bundle,
+  '--config', pkgConfig,
   '--targets', target,
   '--output', outFile,
   '--compress', 'GZip',
