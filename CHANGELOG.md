@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1 (2026-05-18)
+
+First standalone, distributable release — isolated from the Gungnir plugin.
+
+### Distribution
+- **Self-contained binaries — no Node.js required** (esbuild + @yao-pkg/pkg)
+- Portable executables for Linux x64, macOS arm64/x64, Windows x64
+- Native installers: `.deb` + `.AppImage` (Linux), `.dmg` (macOS), `.exe` setup (Windows)
+- `install.sh` / `install.bat` one-line installers; multi-OS release CI
+
+### Changed
+- License moved to **Apache 2.0**
+- Gungnir bridge is now **optional, off by default** (opt-in via `spearcode/gungnir`)
+- `better-sqlite3` native addon embedded and loaded via `nativeBinding`
+
 ## 0.1.0 (2026-04-02)
 
 Initial release of SpearCode.

@@ -1,6 +1,6 @@
 {
   "name": "spearcode",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Standalone AI coding agent for the terminal — 51 tools, 31 models. Optional Gungnir integration.",
   "type": "module",
   "main": "dist/index.js",
