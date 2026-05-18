@@ -1,0 +1,59 @@
+/* SpearCode desktop window — full-bleed terminal, no chrome. */
+@import '@xterm/xterm/css/xterm.css';
+
+:root {
+  --sc-bg: #0f1623;
+  --sc-fg: #e5e7eb;
+  --sc-accent: #dc2626;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--sc-bg);
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+}
+
+#term {
+  position: absolute;
+  inset: 0;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.xterm,
+.xterm .xterm-viewport {
+  height: 100% !important;
+  background: transparent !important;
+}
+
+/* "Session ended" overlay */
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 22, 35, 0.92);
+  backdrop-filter: blur(2px);
+}
+#overlay[hidden] {
+  display: none;
+}
+.overlay-card {
+  text-align: center;
+  color: var(--sc-fg);
+}
+.overlay-card p {
+  margin: 0.3em 0;
+}
+#overlay-msg {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.overlay-hint {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}

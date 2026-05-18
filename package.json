@@ -59,6 +59,9 @@
     "pack:linux": "node scripts/pack-linux.mjs",
     "pack:macos": "node scripts/pack-macos.mjs",
     "pack:windows": "node scripts/pack-windows.mjs",
+    "app:install": "npm --prefix desktop install",
+    "app:dev": "npm --prefix desktop run dev",
+    "app:build": "npm --prefix desktop run build",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
     "release:major": "npm version major && npm publish"
