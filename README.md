@@ -3,7 +3,7 @@
 **AI coding agent for the terminal.** 51 tools, 31 models, built for developers who want more than ChatGPT in a box.
 
 [![npm](https://img.shields.io/npm/v/spearcode)](https://www.npmjs.com/package/spearcode)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/spearcode/spearcode/actions/workflows/ci.yml/badge.svg)](https://github.com/spearcode/spearcode/actions)
 
 ## Features

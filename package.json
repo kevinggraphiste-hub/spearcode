@@ -45,7 +45,7 @@
   "bugs": {
     "url": "https://github.com/spearcode/spearcode/issues"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "SpearCode",
   "scripts": {
     "build": "tsc",
@@ -55,9 +55,18 @@
     "test": "tsx --test tests/**/*.test.ts",
     "lint": "eslint src/",
     "prepublishOnly": "npm run build",
+    "build:bin": "node scripts/build-bin.mjs",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
     "release:major": "npm version major && npm publish"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
+    ],
+    "outputPath": "release"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
@@ -74,12 +83,18 @@
     "@types/node": "^22.12.0",
     "@types/react": "^19.0.0",
     "@types/ws": "^8.18.1",
+    "@yao-pkg/pkg": "^6.14.2",
+    "esbuild": "^0.24.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=20"
   },
-  "os": ["darwin", "linux", "win32"],
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
   "preferGlobal": true
 }

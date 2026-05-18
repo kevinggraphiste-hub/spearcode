@@ -1,0 +1,91 @@
+#!/usr/bin/env node
+/**
+ * SpearCode portable binary builder.
+ *
+ * Pipeline:
+ *   1. esbuild bundles the ESM/TS CLI into a single CommonJS file
+ *      (native / optional modules kept external: better-sqlite3, ws).
+ *   2. @yao-pkg/pkg compiles that bundle into a self-contained executable
+ *      that runs WITHOUT Node installed. better-sqlite3's prebuilt .node
+ *      is embedded and extracted at runtime by pkg.
+ *
+ * Usage:
+ *   node scripts/build-bin.mjs                 # host target only
+ *   node scripts/build-bin.mjs <pkg-target>    # e.g. node20-linux-x64
+ *
+ * pkg targets: node20-linux-x64, node20-linux-arm64,
+ *              node20-macos-x64, node20-macos-arm64,
+ *              node20-win-x64
+ */
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, rmSync, existsSync, chmodSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const bundle = join(root, 'build', 'spearcode.mjs');
+const outDir = join(root, 'release');
+
+const target = process.argv[2] || `node20-${hostTarget()}`;
+
+function hostTarget() {
+  const os = { darwin: 'macos', win32: 'win', linux: 'linux' }[process.platform] ?? 'linux';
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  return `${os}-${arch}`;
+}
+
+function run(cmd, args) {
+  console.log(`$ ${cmd} ${args.join(' ')}`);
+  execFileSync(cmd, args, { stdio: 'inherit', cwd: root });
+}
+
+// ── 1. Clean + bundle ──
+rmSync(join(root, 'build'), { recursive: true, force: true });
+mkdirSync(join(root, 'build'), { recursive: true });
+mkdirSync(outDir, { recursive: true });
+
+run('npx', [
+  'esbuild',
+  'src/cli/index.ts',
+  '--bundle',
+  '--platform=node',
+  // ESM output: Ink's yoga-layout dependency uses top-level await,
+  // which is only valid in ESM (not CJS).
+  '--format=esm',
+  '--target=node20',
+  `--outfile=${bundle}`,
+  // Native addon — embedded & handled by pkg, never bundled by esbuild.
+  '--external:better-sqlite3',
+  // Optional collab dependency, lazily required only when used.
+  '--external:ws',
+  // Ink dev-only devtools integration: alias to a no-op stub so the
+  // dead code path resolves at bundle time (never externalized — pkg
+  // would eagerly require it and crash at startup).
+  `--alias:react-devtools-core=${join(root, 'scripts', 'stub-react-devtools-core.mjs')}`,
+  // ESM bundles have no CJS `require`; reinstate it for the few
+  // `require()` call-sites (collab `ws`, node:fs in testGen).
+  "--banner:js=import{createRequire as ___cr}from'module';const require=___cr(import.meta.url);",
+  '--log-level=warning',
+]);
+
+if (!existsSync(bundle)) {
+  console.error('✗ esbuild did not produce the bundle');
+  process.exit(1);
+}
+
+// ── 2. Compile to a self-contained executable ──
+const isWin = target.includes('win');
+const base = `spearcode-${target.replace(/^node20-/, '')}`;
+const outFile = join(outDir, isWin ? `${base}.exe` : base);
+
+run('npx', [
+  'pkg',
+  bundle,
+  '--targets', target,
+  '--output', outFile,
+  '--compress', 'GZip',
+]);
+
+if (!isWin && existsSync(outFile)) chmodSync(outFile, 0o755);
+
+console.log(`\n✓ Portable binary: ${outFile}`);
