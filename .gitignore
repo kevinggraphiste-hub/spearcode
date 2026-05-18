@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 release/
+scripts/.tools/
 *.db
 *.db-wal
 *.db-shm
