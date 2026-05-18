@@ -73,14 +73,20 @@ function makeIcon(path, size = 256) {
   writeFileSync(path, png);
 }
 
+// Terminal=true → GNOME/most DEs open the configured terminal automatically
+// and run `spearcode` in it (the robust native path for a packaged install;
+// the source/local launcher uses scripts/install-desktop-launcher.sh).
+// Single main Category avoids duplicate menu entries (desktop-file-validate).
 const DESKTOP = `[Desktop Entry]
 Type=Application
+Version=1.0
 Name=SpearCode
 Comment=AI coding agent for the terminal
 Exec=spearcode
 Icon=spearcode
-Categories=Development;Utility;
+Categories=Development;
 Terminal=true
+StartupNotify=true
 `;
 
 mkdirSync(OUT, { recursive: true });

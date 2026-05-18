@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.3 (2026-05-18)
+
+The Linux GUI launcher now actually opens SpearCode.
+
+### Fixed
+- **Desktop icon did nothing**: clicking a plain `.desktop` for a TUI app
+  opens no window (the launch scope has no terminal/keyboard). New tracked,
+  idempotent installer `scripts/install-desktop-launcher.sh` writes a
+  hardened terminal wrapper (robust multi-terminal detection, `setsid`
+  detach, sane `PATH`, visible error dialogs) plus a trusted + executable
+  `.desktop` in the app menu **and** on the Desktop. Every launch attempt
+  is logged to `~/.cache/spearcode/launch.log` for diagnosis.
+- **Duplicate menu entry / validator warning**: packaged `.desktop`
+  (`.deb`/`.AppImage`) used two main `Categories`; now `Development;` only,
+  plus `Version=1.0` and `StartupNotify=true`.
+
 ## 0.1.2 (2026-05-18)
 
 Portable binary now actually launches the TUI. Fixes four real bugs on the

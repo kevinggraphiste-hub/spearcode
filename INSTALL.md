@@ -83,6 +83,19 @@ chmod +x Spearcode-<ver>-x86_64.AppImage
 ./Spearcode-<ver>-x86_64.AppImage
 ```
 
+### Linux — desktop launcher (clickable icon)
+
+SpearCode is a terminal app, so a bare `.desktop` that just runs the binary
+opens nothing when clicked. This installs a proper launcher (app menu **and**
+Desktop icon) that opens a terminal window:
+
+```bash
+bash scripts/install-desktop-launcher.sh            # local source build
+bash scripts/install-desktop-launcher.sh "$(command -v spearcode)"   # after install.sh/.deb
+```
+
+Idempotent — re-run after each upgrade. Launch logs: `~/.cache/spearcode/launch.log`.
+
 ---
 
 ## From source
